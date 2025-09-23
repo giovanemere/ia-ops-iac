@@ -1,0 +1,144 @@
+name: 🚀 Complete Project Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      cloud_provider:
+        description: 'Cloud Provider'
+        required: true
+        type: choice
+        options: ['aws', 'gcp', 'azure', 'oci']
+        default: 'aws'
+      region:
+        description: 'Region'
+        required: true
+        type: string
+        default: 'us-east-1'
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options: ['dev', 'staging', 'prod', 'demo']
+        default: 'demo'
+      project_name:
+        description: 'Project Name'
+        required: true
+        type: string
+        default: 'billpay'
+      deploy_vpc:
+        description: 'Deploy VPC'
+        required: false
+        type: boolean
+        default: false
+      deploy_kubernetes:
+        description: 'Deploy Kubernetes'
+        required: false
+        type: boolean
+        default: false
+      deploy_registry:
+        description: 'Deploy Registry'
+        required: false
+        type: boolean
+        default: false
+      deploy_storage:
+        description: 'Deploy Storage'
+        required: false
+        type: boolean
+        default: true
+      deploy_loadbalancer:
+        description: 'Deploy Load Balancer'
+        required: false
+        type: boolean
+        default: false
+      deploy_backend:
+        description: 'Deploy Backend'
+        required: false
+        type: boolean
+        default: false
+      deploy_frontend_a:
+        description: 'Deploy Frontend A'
+        required: false
+        type: boolean
+        default: true
+      deploy_frontend_b:
+        description: 'Deploy Frontend B'
+        required: false
+        type: boolean
+        default: false
+      deploy_feature_flags:
+        description: 'Deploy Feature Flags'
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      project_name:
+        required: true
+        type: string
+        default: 'billpay'
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+
+jobs:
+  infrastructure:
+    name: 🏗️ Deploy Infrastructure
+    uses: ./.github/workflows/infrastructure.yml
+    with:
+      environment: ${{ inputs.environment }}
+      action: apply
+      project_name: ${{ inputs.project_name }}
+    secrets: inherit
+    
+  backend:
+    name: 🚀 Deploy Backend
+    needs: infrastructure
+    uses: ./.github/workflows/deploy-service.yml
+    with:
+      service_name: billpay-backend
+      service_type: backend
+      environment: ${{ inputs.environment }}
+      project_name: ${{ inputs.project_name }}
+      repository_name: poc-billpay-back
+    secrets: inherit
+    
+  frontend-a:
+    name: 🎨 Deploy Frontend A
+    needs: infrastructure
+    uses: ./.github/workflows/deploy-service.yml
+    with:
+      service_name: frontend-a
+      service_type: frontend
+      environment: ${{ inputs.environment }}
+      project_name: ${{ inputs.project_name }}
+      repository_name: poc-billpay-front-a
+    secrets: inherit
+    
+  frontend-b:
+    name: 🎨 Deploy Frontend B
+    needs: infrastructure
+    uses: ./.github/workflows/deploy-service.yml
+    with:
+      service_name: frontend-b
+      service_type: frontend
+      environment: ${{ inputs.environment }}
+      project_name: ${{ inputs.project_name }}
+      repository_name: poc-billpay-front-b
+    secrets: inherit
+    
+  feature-flags:
+    name: 🎨 Deploy Feature Flags
+    needs: infrastructure
+    uses: ./.github/workflows/deploy-service.yml
+    with:
+      service_name: feature-flags
+      service_type: frontend
+      environment: ${{ inputs.environment }}
+      project_name: ${{ inputs.project_name }}
+      repository_name: poc-billpay-front-feature-flags
+    secrets: inherit
