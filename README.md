@@ -1,41 +1,115 @@
-# BillPay Infrastructure as Code
+# BillPay Infrastructure as Code - Multi-Cloud
 
-Repositorio de infraestructura para el proyecto BillPay usando OpenTofu + Terragrunt.
+Repositorio de infraestructura multi-cloud para el proyecto BillPay usando OpenTofu + Terragrunt.
 
-## Estructura
+## 🌐 Estructura Multi-Cloud
 
 ```
 ia-ops-iac/
-├── environments/          # Configuraciones por ambiente
-│   ├── dev/              # Desarrollo
-│   ├── staging/          # Staging  
-│   └── prod/             # Producción
-├── modules/              # Módulos OpenTofu reutilizables
-│   ├── vpc/              # VPC + Networking
-│   ├── eks/              # EKS Cluster
-│   ├── ecr/              # ECR Repositories
-│   ├── frontend-hosting/ # S3 + CloudFront
-│   └── alb/              # Application Load Balancer
-└── scripts/              # Scripts de automatización
+├── clouds/                    # Configuraciones específicas por cloud
+│   ├── aws/                   # Amazon Web Services
+│   │   ├── environments/      # dev, staging, prod
+│   │   └── modules/          # VPC, EKS, ECR, S3, ALB
+│   ├── gcp/                   # Google Cloud Platform
+│   │   ├── environments/      # dev, staging, prod
+│   │   └── modules/          # VPC, GKE, Container Registry, Cloud Storage
+│   ├── azure/                 # Microsoft Azure
+│   │   ├── environments/      # dev, staging, prod
+│   │   └── modules/          # VNet, AKS, Container Registry, Storage
+│   └── oci/                   # Oracle Cloud Infrastructure
+│       ├── environments/      # dev, staging, prod
+│       └── modules/          # VCN, OKE, Container Registry, Object Storage
+└── shared/                    # Recursos compartidos
+    ├── modules/               # Módulos reutilizables entre clouds
+    ├── scripts/               # Scripts de automatización
+    └── templates/             # Templates Backstage
 ```
 
-## Recursos Desplegados
+## ☁️ Clouds Soportados
 
-- **VPC**: 10.0.0.0/16 con subnets públicas y privadas
-- **EKS Cluster**: Para microservicios backend
-- **ECR Repositories**: 4 repositorios para imágenes Docker
-- **S3 + CloudFront**: Hosting para 3 frontends Angular
-- **Application Load Balancer**: Balanceador de carga
+### 🟠 AWS (Amazon Web Services)
+- **Compute**: EKS (Kubernetes)
+- **Storage**: S3 + CloudFront
+- **Registry**: ECR
+- **Network**: VPC + ALB
+- **Environments**: dev, staging, prod
 
-## Uso desde Backstage
+### 🔵 GCP (Google Cloud Platform)
+- **Compute**: GKE (Kubernetes)
+- **Storage**: Cloud Storage + CDN
+- **Registry**: Container Registry
+- **Network**: VPC + Load Balancer
+- **Environments**: dev, staging, prod
+
+### 🟦 Azure (Microsoft Azure)
+- **Compute**: AKS (Kubernetes)
+- **Storage**: Storage Account + CDN
+- **Registry**: Container Registry
+- **Network**: VNet + Application Gateway
+- **Environments**: dev, staging, prod
+
+### 🔴 OCI (Oracle Cloud Infrastructure)
+- **Compute**: OKE (Kubernetes)
+- **Storage**: Object Storage + CDN
+- **Registry**: Container Registry
+- **Network**: VCN + Load Balancer
+- **Environments**: dev, staging, prod
+
+## 🚀 Uso desde Backstage
 
 1. Ir a Backstage: `http://localhost:3000`
 2. Create → "BillPay Infrastructure"
-3. Seleccionar environment (dev/staging/prod)
-4. Deploy automático
+3. Seleccionar **cloud provider** (AWS/GCP/Azure/OCI)
+4. Seleccionar **environment** (dev/staging/prod)
+5. Deploy automático
 
-## Costos Estimados
+## 💰 Costos Estimados por Cloud
 
+### AWS
 - **Dev**: $170-265/mes
 - **Staging**: $200-300/mes  
 - **Prod**: $300-450/mes
+
+### GCP
+- **Dev**: $150-240/mes
+- **Staging**: $180-280/mes
+- **Prod**: $280-420/mes
+
+### Azure
+- **Dev**: $160-250/mes
+- **Staging**: $190-290/mes
+- **Prod**: $290-440/mes
+
+### OCI
+- **Dev**: $140-220/mes
+- **Staging**: $170-260/mes
+- **Prod**: $260-400/mes
+
+## 🛠️ Deploy Manual
+
+```bash
+# AWS
+cd clouds/aws/environments/dev
+terragrunt plan && terragrunt apply
+
+# GCP
+cd clouds/gcp/environments/dev
+terragrunt plan && terragrunt apply
+
+# Azure
+cd clouds/azure/environments/dev
+terragrunt plan && terragrunt apply
+
+# OCI
+cd clouds/oci/environments/dev
+terragrunt plan && terragrunt apply
+```
+
+## 🎯 Recursos Desplegados (Todos los Clouds)
+
+- **Kubernetes Cluster** (EKS/GKE/AKS/OKE)
+- **Container Registry** (4 repositorios)
+- **Frontend Hosting** (3 frontends con CDN)
+- **Load Balancer** (Application/Network)
+- **Networking** (VPC/VNet/VCN completo)
+- **Monitoring** (CloudWatch/Stackdriver/Monitor/Monitoring)
