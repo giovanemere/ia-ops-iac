@@ -1,0 +1,29 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: billpay-infrastructure
+  title: BillPay Infrastructure as Code
+  description: Infraestructura AWS para BillPay usando OpenTofu + Terragrunt
+  annotations:
+    github.com/project-slug: giovanemere/ia-ops-iac
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - billpay
+    - infrastructure
+    - aws
+    - opentofu
+    - terragrunt
+spec:
+  type: infrastructure
+  lifecycle: production
+  owner: platform-team
+  system: billpay-platform
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: billpay-platform
+  title: BillPay Platform
+  description: Sistema de pagos enterprise BillPay
+spec:
+  owner: platform-team
