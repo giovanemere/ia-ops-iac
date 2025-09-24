@@ -31,46 +31,16 @@ on:
         type: choice
         options: ['oidc', 'legacy']
         default: 'oidc'
-      deploy_vpc:
-        description: 'Deploy VPC'
+      infrastructure:
+        description: 'Infrastructure: VPC,Registry,Storage,LoadBalancer'
         required: false
-        type: boolean
-        default: true
-      deploy_registry:
-        description: 'Deploy Container Registry'
+        type: string
+        default: 'true,true,true,true'
+      applications:
+        description: 'Apps: Backend,Frontend-A,Frontend-B,FeatureFlags'
         required: false
-        type: boolean
-        default: true
-      deploy_storage:
-        description: 'Deploy Storage (S3/Cloud Storage)'
-        required: false
-        type: boolean
-        default: true
-      deploy_loadbalancer:
-        description: 'Deploy Load Balancer'
-        required: false
-        type: boolean
-        default: true
-      deploy_backend:
-        description: 'Deploy Backend'
-        required: false
-        type: boolean
-        default: false
-      deploy_frontend_a:
-        description: 'Deploy Frontend A'
-        required: false
-        type: boolean
-        default: true
-      deploy_frontend_b:
-        description: 'Deploy Frontend B'
-        required: false
-        type: boolean
-        default: false
-      deploy_feature_flags:
-        description: 'Deploy Feature Flags'
-        required: false
-        type: boolean
-        default: false
+        type: string
+        default: 'false,true,false,false'
       kubernetes_type:
         description: 'Kubernetes Type'
         required: false
@@ -137,26 +107,36 @@ jobs:
     needs: auth-setup
     runs-on: ubuntu-latest
     outputs:
-      deploy_vpc: ${{ inputs.deploy_vpc }}
-      deploy_registry: ${{ inputs.deploy_registry }}
-      deploy_storage: ${{ inputs.deploy_storage }}
-      deploy_loadbalancer: ${{ inputs.deploy_loadbalancer }}
-      deploy_backend: ${{ inputs.deploy_backend }}
-      deploy_frontend_a: ${{ inputs.deploy_frontend_a }}
-      deploy_frontend_b: ${{ inputs.deploy_frontend_b }}
-      deploy_feature_flags: ${{ inputs.deploy_feature_flags }}
+      deploy_vpc: ${{ steps.parse.outputs.deploy_vpc }}
+      deploy_registry: ${{ steps.parse.outputs.deploy_registry }}
+      deploy_storage: ${{ steps.parse.outputs.deploy_storage }}
+      deploy_loadbalancer: ${{ steps.parse.outputs.deploy_loadbalancer }}
+      deploy_backend: ${{ steps.parse.outputs.deploy_backend }}
+      deploy_frontend_a: ${{ steps.parse.outputs.deploy_frontend_a }}
+      deploy_frontend_b: ${{ steps.parse.outputs.deploy_frontend_b }}
+      deploy_feature_flags: ${{ steps.parse.outputs.deploy_feature_flags }}
     steps:
       - name: Parse inputs
+        id: parse
         run: |
-          echo "✅ Inputs parsed successfully"
-          echo "VPC: ${{ inputs.deploy_vpc }}"
-          echo "Registry: ${{ inputs.deploy_registry }}"
-          echo "Storage: ${{ inputs.deploy_storage }}"
+          # Parse infrastructure: vpc,registry,storage,lb
+          IFS=',' read -ra INFRA <<< "${{ inputs.infrastructure }}"
+          echo "deploy_vpc=${INFRA[0]}" >> $GITHUB_OUTPUT
+          echo "deploy_registry=${INFRA[1]}" >> $GITHUB_OUTPUT
+          echo "deploy_storage=${INFRA[2]}" >> $GITHUB_OUTPUT
+          echo "deploy_loadbalancer=${INFRA[3]}" >> $GITHUB_OUTPUT
+          
+          # Parse applications: backend,frontend-a,frontend-b,feature-flags
+          IFS=',' read -ra APPS <<< "${{ inputs.applications }}"
+          echo "deploy_backend=${APPS[0]}" >> $GITHUB_OUTPUT
+          echo "deploy_frontend_a=${APPS[1]}" >> $GITHUB_OUTPUT
+          echo "deploy_frontend_b=${APPS[2]}" >> $GITHUB_OUTPUT
+          echo "deploy_feature_flags=${APPS[3]}" >> $GITHUB_OUTPUT
 
   infrastructure:
     name: 🏗️ Deploy Infrastructure
     needs: parse-inputs
-    if: inputs.deploy_vpc == true
+    if: needs.parse-inputs.outputs.deploy_vpc == 'true'
     uses: giovanemere/ia-ops-iac/.github/workflows/infrastructure.yml@trunk
     with:
       environment: ${{ inputs.environment }}
