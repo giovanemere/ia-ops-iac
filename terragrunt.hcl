@@ -1,13 +1,10 @@
 # Root terragrunt configuration
 
+# Use local backend for simplicity
 remote_state {
-  backend = "s3"
+  backend = "local"
   config = {
-    bucket         = "billpay-terraform-state-${get_aws_account_id()}"
-    key            = "${path_relative_to_include()}/terraform.tfstate"
-    region         = "us-east-1"
-    encrypt        = true
-    dynamodb_table = "billpay-terraform-locks"
+    path = "${get_terragrunt_dir()}/terraform.tfstate"
   }
   generate = {
     path      = "backend.tf"
