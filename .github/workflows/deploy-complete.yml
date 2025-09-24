@@ -25,51 +25,22 @@ on:
         required: true
         type: string
         default: 'billpay'
-      deploy_vpc:
-        description: 'Deploy VPC'
+      infrastructure_components:
+        description: 'Infrastructure Components (vpc,k8s,registry,storage,lb)'
         required: false
-        type: boolean
-        default: false
-      deploy_kubernetes:
-        description: 'Deploy Kubernetes'
+        type: string
+        default: 'true,eks,true,true,true'
+      application_components:
+        description: 'Application Components (backend,frontend-a,frontend-b,feature-flags)'
         required: false
-        type: boolean
-        default: false
-      deploy_registry:
-        description: 'Deploy Registry'
+        type: string
+        default: 'false,true,false,false'
+      kubernetes_type:
+        description: 'Kubernetes Type'
         required: false
-        type: boolean
-        default: false
-      deploy_storage:
-        description: 'Deploy Storage'
-        required: false
-        type: boolean
-        default: true
-      deploy_loadbalancer:
-        description: 'Deploy Load Balancer'
-        required: false
-        type: boolean
-        default: false
-      deploy_backend:
-        description: 'Deploy Backend'
-        required: false
-        type: boolean
-        default: false
-      deploy_frontend_a:
-        description: 'Deploy Frontend A'
-        required: false
-        type: boolean
-        default: true
-      deploy_frontend_b:
-        description: 'Deploy Frontend B'
-        required: false
-        type: boolean
-        default: false
-      deploy_feature_flags:
-        description: 'Deploy Feature Flags'
-        required: false
-        type: boolean
-        default: false
+        type: choice
+        options: ['eks', 'gke', 'aks', 'oke']
+        default: 'eks'
   workflow_call:
     inputs:
       environment:
@@ -86,8 +57,42 @@ on:
         required: true
 
 jobs:
+  parse-inputs:
+    name: 🔍 Parse Deployment Configuration
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_vpc: ${{ steps.parse.outputs.deploy_vpc }}
+      deploy_kubernetes: ${{ steps.parse.outputs.deploy_kubernetes }}
+      deploy_registry: ${{ steps.parse.outputs.deploy_registry }}
+      deploy_storage: ${{ steps.parse.outputs.deploy_storage }}
+      deploy_loadbalancer: ${{ steps.parse.outputs.deploy_loadbalancer }}
+      deploy_backend: ${{ steps.parse.outputs.deploy_backend }}
+      deploy_frontend_a: ${{ steps.parse.outputs.deploy_frontend_a }}
+      deploy_frontend_b: ${{ steps.parse.outputs.deploy_frontend_b }}
+      deploy_feature_flags: ${{ steps.parse.outputs.deploy_feature_flags }}
+    steps:
+      - name: Parse consolidated inputs
+        id: parse
+        run: |
+          # Parse infrastructure components: vpc,k8s,registry,storage,lb
+          IFS=',' read -ra INFRA <<< "${{ inputs.infrastructure_components }}"
+          echo "deploy_vpc=${INFRA[0]}" >> $GITHUB_OUTPUT
+          echo "deploy_kubernetes=${INFRA[1]}" >> $GITHUB_OUTPUT
+          echo "deploy_registry=${INFRA[2]}" >> $GITHUB_OUTPUT
+          echo "deploy_storage=${INFRA[3]}" >> $GITHUB_OUTPUT
+          echo "deploy_loadbalancer=${INFRA[4]}" >> $GITHUB_OUTPUT
+          
+          # Parse application components: backend,frontend-a,frontend-b,feature-flags
+          IFS=',' read -ra APPS <<< "${{ inputs.application_components }}"
+          echo "deploy_backend=${APPS[0]}" >> $GITHUB_OUTPUT
+          echo "deploy_frontend_a=${APPS[1]}" >> $GITHUB_OUTPUT
+          echo "deploy_frontend_b=${APPS[2]}" >> $GITHUB_OUTPUT
+          echo "deploy_feature_flags=${APPS[3]}" >> $GITHUB_OUTPUT
+
   infrastructure:
     name: 🏗️ Deploy Infrastructure
+    needs: parse-inputs
+    if: needs.parse-inputs.outputs.deploy_vpc == 'true'
     uses: ./.github/workflows/infrastructure.yml
     with:
       environment: ${{ inputs.environment }}
@@ -97,7 +102,8 @@ jobs:
     
   backend:
     name: 🚀 Deploy Backend
-    needs: infrastructure
+    needs: [parse-inputs, infrastructure]
+    if: needs.parse-inputs.outputs.deploy_backend == 'true'
     uses: ./.github/workflows/deploy-service.yml
     with:
       service_name: billpay-backend
@@ -109,7 +115,8 @@ jobs:
     
   frontend-a:
     name: 🎨 Deploy Frontend A
-    needs: infrastructure
+    needs: [parse-inputs, infrastructure]
+    if: needs.parse-inputs.outputs.deploy_frontend_a == 'true'
     uses: ./.github/workflows/deploy-service.yml
     with:
       service_name: frontend-a
@@ -121,7 +128,8 @@ jobs:
     
   frontend-b:
     name: 🎨 Deploy Frontend B
-    needs: infrastructure
+    needs: [parse-inputs, infrastructure]
+    if: needs.parse-inputs.outputs.deploy_frontend_b == 'true'
     uses: ./.github/workflows/deploy-service.yml
     with:
       service_name: frontend-b
@@ -133,7 +141,8 @@ jobs:
     
   feature-flags:
     name: 🎨 Deploy Feature Flags
-    needs: infrastructure
+    needs: [parse-inputs, infrastructure]
+    if: needs.parse-inputs.outputs.deploy_feature_flags == 'true'
     uses: ./.github/workflows/deploy-service.yml
     with:
       service_name: feature-flags
