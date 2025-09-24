@@ -31,51 +31,16 @@ on:
         type: choice
         options: ['oidc', 'legacy']
         default: 'oidc'
-      deploy_vpc:
-        description: 'Deploy VPC'
+      infrastructure:
+        description: 'Infrastructure: vpc,k8s,registry,storage,lb'
         required: false
         type: string
-        default: 'true'
-      deploy_kubernetes:
-        description: 'Deploy Kubernetes'
+        default: 'true,true,true,true,true'
+      applications:
+        description: 'Applications: backend,frontend-a,frontend-b,feature-flags'
         required: false
         type: string
-        default: 'true'
-      deploy_registry:
-        description: 'Deploy Registry'
-        required: false
-        type: string
-        default: 'true'
-      deploy_storage:
-        description: 'Deploy Storage'
-        required: false
-        type: string
-        default: 'true'
-      deploy_loadbalancer:
-        description: 'Deploy Load Balancer'
-        required: false
-        type: string
-        default: 'true'
-      deploy_backend:
-        description: 'Deploy Backend'
-        required: false
-        type: string
-        default: 'true'
-      deploy_frontend_a:
-        description: 'Deploy Frontend A'
-        required: false
-        type: string
-        default: 'true'
-      deploy_frontend_b:
-        description: 'Deploy Frontend B'
-        required: false
-        type: string
-        default: 'false'
-      deploy_feature_flags:
-        description: 'Deploy Feature Flags'
-        required: false
-        type: string
-        default: 'false'
+        default: 'true,true,false,false'
       kubernetes_type:
         description: 'Kubernetes Type'
         required: false
