@@ -125,6 +125,11 @@ jobs:
           }
           EOF
           
+          # Disable Block Public Access first
+          echo "🔓 Disabling Block Public Access..."
+          aws s3api put-public-access-block --bucket $BUCKET_NAME --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+          
+          # Apply public policy
           aws s3api put-bucket-policy --bucket $BUCKET_NAME --policy file:///tmp/bucket-policy.json
           echo "✅ S3 bucket configured for static hosting"
         
