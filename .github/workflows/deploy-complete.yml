@@ -31,16 +31,46 @@ on:
         type: choice
         options: ['oidc', 'legacy']
         default: 'oidc'
-      infrastructure_components:
-        description: 'Infrastructure Components (vpc,k8s,registry,storage,lb)'
+      deploy_vpc:
+        description: 'Deploy VPC'
         required: false
-        type: string
-        default: 'true,eks,true,true,true'
-      application_components:
-        description: 'Application Components (backend,frontend-a,frontend-b,feature-flags)'
+        type: boolean
+        default: true
+      deploy_registry:
+        description: 'Deploy Container Registry'
         required: false
-        type: string
-        default: 'false,true,false,false'
+        type: boolean
+        default: true
+      deploy_storage:
+        description: 'Deploy Storage (S3/Cloud Storage)'
+        required: false
+        type: boolean
+        default: true
+      deploy_loadbalancer:
+        description: 'Deploy Load Balancer'
+        required: false
+        type: boolean
+        default: true
+      deploy_backend:
+        description: 'Deploy Backend'
+        required: false
+        type: boolean
+        default: false
+      deploy_frontend_a:
+        description: 'Deploy Frontend A'
+        required: false
+        type: boolean
+        default: true
+      deploy_frontend_b:
+        description: 'Deploy Frontend B'
+        required: false
+        type: boolean
+        default: false
+      deploy_feature_flags:
+        description: 'Deploy Feature Flags'
+        required: false
+        type: boolean
+        default: false
       kubernetes_type:
         description: 'Kubernetes Type'
         required: false
@@ -107,38 +137,26 @@ jobs:
     needs: auth-setup
     runs-on: ubuntu-latest
     outputs:
-      deploy_vpc: ${{ steps.parse.outputs.deploy_vpc }}
-      deploy_kubernetes: ${{ steps.parse.outputs.deploy_kubernetes }}
-      deploy_registry: ${{ steps.parse.outputs.deploy_registry }}
-      deploy_storage: ${{ steps.parse.outputs.deploy_storage }}
-      deploy_loadbalancer: ${{ steps.parse.outputs.deploy_loadbalancer }}
-      deploy_backend: ${{ steps.parse.outputs.deploy_backend }}
-      deploy_frontend_a: ${{ steps.parse.outputs.deploy_frontend_a }}
-      deploy_frontend_b: ${{ steps.parse.outputs.deploy_frontend_b }}
-      deploy_feature_flags: ${{ steps.parse.outputs.deploy_feature_flags }}
+      deploy_vpc: ${{ inputs.deploy_vpc }}
+      deploy_registry: ${{ inputs.deploy_registry }}
+      deploy_storage: ${{ inputs.deploy_storage }}
+      deploy_loadbalancer: ${{ inputs.deploy_loadbalancer }}
+      deploy_backend: ${{ inputs.deploy_backend }}
+      deploy_frontend_a: ${{ inputs.deploy_frontend_a }}
+      deploy_frontend_b: ${{ inputs.deploy_frontend_b }}
+      deploy_feature_flags: ${{ inputs.deploy_feature_flags }}
     steps:
-      - name: Parse consolidated inputs
-        id: parse
+      - name: Parse inputs
         run: |
-          # Parse infrastructure components: vpc,k8s,registry,storage,lb
-          IFS=',' read -ra INFRA <<< "${{ inputs.infrastructure_components }}"
-          echo "deploy_vpc=${INFRA[0]}" >> $GITHUB_OUTPUT
-          echo "deploy_kubernetes=${INFRA[1]}" >> $GITHUB_OUTPUT
-          echo "deploy_registry=${INFRA[2]}" >> $GITHUB_OUTPUT
-          echo "deploy_storage=${INFRA[3]}" >> $GITHUB_OUTPUT
-          echo "deploy_loadbalancer=${INFRA[4]}" >> $GITHUB_OUTPUT
-          
-          # Parse application components: backend,frontend-a,frontend-b,feature-flags
-          IFS=',' read -ra APPS <<< "${{ inputs.application_components }}"
-          echo "deploy_backend=${APPS[0]}" >> $GITHUB_OUTPUT
-          echo "deploy_frontend_a=${APPS[1]}" >> $GITHUB_OUTPUT
-          echo "deploy_frontend_b=${APPS[2]}" >> $GITHUB_OUTPUT
-          echo "deploy_feature_flags=${APPS[3]}" >> $GITHUB_OUTPUT
+          echo "✅ Inputs parsed successfully"
+          echo "VPC: ${{ inputs.deploy_vpc }}"
+          echo "Registry: ${{ inputs.deploy_registry }}"
+          echo "Storage: ${{ inputs.deploy_storage }}"
 
   infrastructure:
     name: 🏗️ Deploy Infrastructure
     needs: parse-inputs
-    if: needs.parse-inputs.outputs.deploy_vpc == 'true'
+    if: inputs.deploy_vpc == true
     uses: giovanemere/ia-ops-iac/.github/workflows/infrastructure.yml@trunk
     with:
       environment: ${{ inputs.environment }}
