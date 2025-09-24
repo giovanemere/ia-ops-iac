@@ -25,6 +25,12 @@ on:
         required: true
         type: string
         default: 'billpay'
+      auth_method:
+        description: 'Authentication Method'
+        required: false
+        type: choice
+        options: ['oidc', 'legacy']
+        default: 'oidc'
       infrastructure_components:
         description: 'Infrastructure Components (vpc,k8s,registry,storage,lb)'
         required: false
@@ -56,9 +62,49 @@ on:
       AWS_SECRET_ACCESS_KEY:
         required: true
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
+  auth-setup:
+    name: 🔐 Setup Authentication
+    runs-on: ubuntu-latest
+    outputs:
+      auth_configured: ${{ steps.auth.outputs.configured }}
+    steps:
+      - name: 🔐 Configure AWS Credentials (OIDC)
+        if: ${{ inputs.auth_method == 'oidc' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: BillPayCompleteStack
+          aws-region: ${{ inputs.region }}
+          
+      - name: 🔑 Configure AWS Credentials (Legacy)
+        if: ${{ inputs.auth_method == 'legacy' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.region }}
+          
+      - name: ✅ Verify Authentication
+        id: auth
+        run: |
+          echo "🔐 Testing AWS connection..."
+          if aws sts get-caller-identity; then
+            echo "✅ AWS authentication successful"
+            echo "configured=true" >> $GITHUB_OUTPUT
+          else
+            echo "❌ AWS authentication failed"
+            echo "configured=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
   parse-inputs:
     name: 🔍 Parse Deployment Configuration
+    needs: auth-setup
     runs-on: ubuntu-latest
     outputs:
       deploy_vpc: ${{ steps.parse.outputs.deploy_vpc }}
