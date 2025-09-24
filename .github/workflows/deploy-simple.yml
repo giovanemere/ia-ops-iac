@@ -59,8 +59,33 @@ jobs:
     - name: 🔐 Verify AWS Connection
       run: |
         echo "🔐 Testing AWS connection..."
-        aws sts get-caller-identity
-        echo "✅ AWS connection successful"
+        if aws sts get-caller-identity; then
+          echo "✅ AWS connection successful"
+          aws sts get-caller-identity --output table
+        else
+          echo "❌ AWS connection failed"
+          echo ""
+          echo "🔍 Common issues:"
+          echo "1. Invalid AWS Access Key ID"
+          echo "2. Invalid AWS Secret Access Key"
+          echo "3. Keys from different AWS account"
+          echo "4. Keys may be expired or deactivated"
+          echo ""
+          echo "🔧 To fix:"
+          echo "1. Go to AWS Console → IAM → Users"
+          echo "2. Select your user → Security credentials"
+          echo "3. Create new access key"
+          echo "4. Update repository secrets with new keys"
+          echo "5. Ensure user has S3 permissions"
+          echo ""
+          echo "📋 Required permissions:"
+          echo "- s3:CreateBucket"
+          echo "- s3:PutObject"
+          echo "- s3:PutBucketPolicy"
+          echo "- s3:PutBucketWebsite"
+          echo ""
+          exit 1
+        fi
         
     - name: 🗄️ Create S3 Bucket for Frontend
       run: |
@@ -192,24 +217,49 @@ jobs:
       if: failure()
       run: |
         echo ""
-        echo "❌ Deployment Failed - AWS Credentials Missing"
-        echo "============================================="
+        echo "❌ Deployment Failed - AWS Credentials Issue"
+        echo "==========================================="
         echo ""
-        echo "📋 To fix this issue, add AWS credentials to repository secrets:"
+        echo "🔍 The error indicates one of these issues:"
+        echo "1. ❌ AWS Access Key ID is incorrect"
+        echo "2. ❌ AWS Secret Access Key is incorrect"
+        echo "3. ❌ Keys are from wrong AWS account"
+        echo "4. ❌ Keys are expired or deactivated"
+        echo "5. ❌ User lacks required S3 permissions"
         echo ""
-        echo "1. Go to: https://github.com/giovanemere/ia-ops-iac/settings/secrets/actions"
-        echo "2. Click 'New repository secret'"
-        echo "3. Add these secrets:"
-        echo "   - Name: AWS_ACCESS_KEY_ID"
-        echo "   - Value: Your AWS Access Key ID"
-        echo "   - Name: AWS_SECRET_ACCESS_KEY" 
-        echo "   - Value: Your AWS Secret Access Key"
+        echo "🔧 Step-by-step fix:"
         echo ""
-        echo "🔑 How to get AWS credentials:"
-        echo "1. Go to AWS Console → IAM → Users"
-        echo "2. Create or select a user"
-        echo "3. Attach policy: AmazonS3FullAccess"
-        echo "4. Go to Security credentials → Create access key"
-        echo "5. Copy the Access Key ID and Secret Access Key"
+        echo "1. 🔑 Get NEW AWS credentials:"
+        echo "   - Go to: https://console.aws.amazon.com/iam/home#/users"
+        echo "   - Select your user (or create new one)"
+        echo "   - Go to 'Security credentials' tab"
+        echo "   - Click 'Create access key'"
+        echo "   - Choose 'Command Line Interface (CLI)'"
+        echo "   - Copy the Access Key ID and Secret Access Key"
         echo ""
-        echo "🔄 After adding secrets, re-run this workflow"
+        echo "2. 📋 Required IAM permissions (attach to user):"
+        echo "   {
+            \"Version\": \"2012-10-17\",
+            \"Statement\": [
+                {
+                    \"Effect\": \"Allow\",
+                    \"Action\": [
+                        \"s3:CreateBucket\",
+                        \"s3:PutObject\",
+                        \"s3:PutBucketPolicy\",
+                        \"s3:PutBucketWebsite\",
+                        \"s3:PutBucketAcl\"
+                    ],
+                    \"Resource\": \"*\"
+                }
+            ]
+        }"
+        echo ""
+        echo "3. 🔄 Update repository secrets:"
+        echo "   - Go to: https://github.com/giovanemere/ia-ops-iac/settings/secrets/actions"
+        echo "   - Update AWS_ACCESS_KEY_ID with NEW key"
+        echo "   - Update AWS_SECRET_ACCESS_KEY with NEW secret"
+        echo ""
+        echo "4. 🚀 Re-run this workflow"
+        echo ""
+        echo "💡 Alternative: Use AWS CloudShell or local AWS CLI to test keys first"
