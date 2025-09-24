@@ -93,7 +93,7 @@ jobs:
     name: 🏗️ Deploy Infrastructure
     needs: parse-inputs
     if: needs.parse-inputs.outputs.deploy_vpc == 'true'
-    uses: ./.github/workflows/infrastructure.yml
+    uses: giovanemere/ia-ops-iac/.github/workflows/infrastructure.yml@trunk
     with:
       environment: ${{ inputs.environment }}
       action: apply
@@ -104,7 +104,7 @@ jobs:
     name: 🚀 Deploy Backend
     needs: [parse-inputs, infrastructure]
     if: needs.parse-inputs.outputs.deploy_backend == 'true'
-    uses: ./.github/workflows/deploy-service.yml
+    uses: giovanemere/ia-ops-iac/.github/workflows/deploy-service.yml@trunk
     with:
       service_name: billpay-backend
       service_type: backend
@@ -117,7 +117,7 @@ jobs:
     name: 🎨 Deploy Frontend A
     needs: [parse-inputs, infrastructure]
     if: needs.parse-inputs.outputs.deploy_frontend_a == 'true'
-    uses: ./.github/workflows/deploy-service.yml
+    uses: giovanemere/ia-ops-iac/.github/workflows/deploy-service.yml@trunk
     with:
       service_name: frontend-a
       service_type: frontend
@@ -130,7 +130,7 @@ jobs:
     name: 🎨 Deploy Frontend B
     needs: [parse-inputs, infrastructure]
     if: needs.parse-inputs.outputs.deploy_frontend_b == 'true'
-    uses: ./.github/workflows/deploy-service.yml
+    uses: giovanemere/ia-ops-iac/.github/workflows/deploy-service.yml@trunk
     with:
       service_name: frontend-b
       service_type: frontend
@@ -143,7 +143,7 @@ jobs:
     name: 🎨 Deploy Feature Flags
     needs: [parse-inputs, infrastructure]
     if: needs.parse-inputs.outputs.deploy_feature_flags == 'true'
-    uses: ./.github/workflows/deploy-service.yml
+    uses: giovanemere/ia-ops-iac/.github/workflows/deploy-service.yml@trunk
     with:
       service_name: feature-flags
       service_type: frontend
