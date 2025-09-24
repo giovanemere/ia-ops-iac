@@ -47,21 +47,6 @@ on:
         type: choice
         options: ['eks', 'gke', 'aks', 'oke']
         default: 'eks'
-  workflow_call:
-    inputs:
-      environment:
-        required: true
-        type: string
-      project_name:
-        required: true
-        type: string
-        default: 'billpay'
-    secrets:
-      AWS_ACCESS_KEY_ID:
-        required: true
-      AWS_SECRET_ACCESS_KEY:
-        required: true
-
 permissions:
   id-token: write
   contents: read
