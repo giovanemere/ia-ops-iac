@@ -35,12 +35,32 @@ jobs:
         echo "⏰ Started at: $(date)"
         echo ""
         
+    - name: 🔍 Check AWS Credentials
+      run: |
+        echo "🔍 Checking AWS credentials availability..."
+        if [ -z "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+          echo "❌ AWS_ACCESS_KEY_ID secret not found"
+          echo "📋 Please add AWS credentials to repository secrets:"
+          echo "   - AWS_ACCESS_KEY_ID"
+          echo "   - AWS_SECRET_ACCESS_KEY"
+          echo "🔗 Go to: https://github.com/giovanemere/ia-ops-iac/settings/secrets/actions"
+          exit 1
+        else
+          echo "✅ AWS credentials found in secrets"
+        fi
+        
     - name: ⚙️ Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
+        
+    - name: 🔐 Verify AWS Connection
+      run: |
+        echo "🔐 Testing AWS connection..."
+        aws sts get-caller-identity
+        echo "✅ AWS connection successful"
         
     - name: 🗄️ Create S3 Bucket for Frontend
       run: |
@@ -167,3 +187,29 @@ jobs:
         echo "aws s3 rb s3://$BUCKET_NAME --force"
         echo ""
         echo "✅ Demo ready for testing!"
+        
+    - name: ❌ AWS Credentials Setup Instructions
+      if: failure()
+      run: |
+        echo ""
+        echo "❌ Deployment Failed - AWS Credentials Missing"
+        echo "============================================="
+        echo ""
+        echo "📋 To fix this issue, add AWS credentials to repository secrets:"
+        echo ""
+        echo "1. Go to: https://github.com/giovanemere/ia-ops-iac/settings/secrets/actions"
+        echo "2. Click 'New repository secret'"
+        echo "3. Add these secrets:"
+        echo "   - Name: AWS_ACCESS_KEY_ID"
+        echo "   - Value: Your AWS Access Key ID"
+        echo "   - Name: AWS_SECRET_ACCESS_KEY" 
+        echo "   - Value: Your AWS Secret Access Key"
+        echo ""
+        echo "🔑 How to get AWS credentials:"
+        echo "1. Go to AWS Console → IAM → Users"
+        echo "2. Create or select a user"
+        echo "3. Attach policy: AmazonS3FullAccess"
+        echo "4. Go to Security credentials → Create access key"
+        echo "5. Copy the Access Key ID and Secret Access Key"
+        echo ""
+        echo "🔄 After adding secrets, re-run this workflow"
