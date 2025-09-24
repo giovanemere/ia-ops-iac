@@ -88,40 +88,45 @@ jobs:
         fi
         
     - name: 🗄️ Create S3 Bucket for Frontend
-      run: |
-        BUCKET_NAME="${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-frontend-a"
-        echo "🗄️ Creating S3 bucket: $BUCKET_NAME"
-        
-        # Create bucket
-        if aws s3 mb s3://$BUCKET_NAME --region ${{ env.AWS_REGION }}; then
-          echo "✅ Bucket created successfully: $BUCKET_NAME"
-        else
-          echo "ℹ️  Bucket may already exist: $BUCKET_NAME"
-        fi
-        
-        # Configure for static website hosting
-        echo "🌐 Configuring static website hosting..."
-        aws s3 website s3://$BUCKET_NAME --index-document index.html --error-document error.html
-        
-        # Set public read policy
-        echo "🔓 Setting public read policy..."
-        cat > /tmp/bucket-policy.json << EOF
-        {
-          "Version": "2012-10-17",
-          "Statement": [
-            {
-              "Sid": "PublicReadGetObject",
-              "Effect": "Allow",
-              "Principal": "*",
-              "Action": "s3:GetObject",
-              "Resource": "arn:aws:s3:::$BUCKET_NAME/*"
-            }
-          ]
-        }
-        EOF
-        
-        aws s3api put-bucket-policy --bucket $BUCKET_NAME --policy file:///tmp/bucket-policy.json
-        echo "✅ S3 bucket configured for static hosting"
+      uses: nick-fields/retry@v3
+      with:
+        timeout_minutes: 5
+        max_attempts: 3
+        retry_on: error
+        command: |
+          BUCKET_NAME="${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-frontend-a"
+          echo "🗄️ Creating S3 bucket: $BUCKET_NAME"
+          
+          # Create bucket
+          if aws s3 mb s3://$BUCKET_NAME --region ${{ env.AWS_REGION }}; then
+            echo "✅ Bucket created successfully: $BUCKET_NAME"
+          else
+            echo "ℹ️  Bucket may already exist: $BUCKET_NAME"
+          fi
+          
+          # Configure for static website hosting
+          echo "🌐 Configuring static website hosting..."
+          aws s3 website s3://$BUCKET_NAME --index-document index.html --error-document error.html
+          
+          # Set public read policy
+          echo "🔓 Setting public read policy..."
+          cat > /tmp/bucket-policy.json << EOF
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "PublicReadGetObject",
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "s3:GetObject",
+                "Resource": "arn:aws:s3:::$BUCKET_NAME/*"
+              }
+            ]
+          }
+          EOF
+          
+          aws s3api put-bucket-policy --bucket $BUCKET_NAME --policy file:///tmp/bucket-policy.json
+          echo "✅ S3 bucket configured for static hosting"
         
     - name: 📦 Deploy Sample Frontend Content
       run: |
@@ -211,7 +216,29 @@ jobs:
         echo "🧹 Cleanup command:"
         echo "aws s3 rb s3://$BUCKET_NAME --force"
         echo ""
-        echo "✅ Demo ready for testing!"
+    - name: 🔍 Health Check Website
+      run: |
+        BUCKET_NAME="${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-frontend-a"
+        WEBSITE_URL="http://$BUCKET_NAME.s3-website-${{ env.AWS_REGION }}.amazonaws.com"
+        
+        echo "🔍 Performing health check on deployed website..."
+        echo "URL: $WEBSITE_URL"
+        
+        # Wait for DNS propagation
+        sleep 10
+        
+        # Check if website is accessible
+        for i in {1..5}; do
+          echo "🔄 Health check attempt $i/5..."
+          if curl -s -f "$WEBSITE_URL" > /dev/null; then
+            echo "✅ Website is accessible and responding"
+            echo "🌐 Website URL: $WEBSITE_URL"
+            break
+          else
+            echo "⏳ Website not ready yet, waiting..."
+            sleep 10
+          fi
+        done
         
     - name: ❌ AWS Credentials Setup Instructions
       if: failure()
@@ -263,3 +290,19 @@ jobs:
         echo "4. 🚀 Re-run this workflow"
         echo ""
         echo "💡 Alternative: Use AWS CloudShell or local AWS CLI to test keys first"
+        
+    - name: 🧹 Cleanup on Failure
+      if: failure()
+      run: |
+        echo "🧹 Cleaning up resources due to deployment failure..."
+        BUCKET_NAME="${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-frontend-a"
+        
+        # Remove bucket if it was created
+        if aws s3api head-bucket --bucket "$BUCKET_NAME" 2>/dev/null; then
+          echo "🗑️  Removing bucket: $BUCKET_NAME"
+          aws s3 rm s3://$BUCKET_NAME --recursive || true
+          aws s3 rb s3://$BUCKET_NAME || true
+          echo "✅ Cleanup completed"
+        else
+          echo "ℹ️  No bucket to clean up"
+        fi
