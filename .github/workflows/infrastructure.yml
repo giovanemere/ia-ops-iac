@@ -24,6 +24,10 @@ env:
   TF_VAR_environment: ${{ inputs.environment }}
   TF_VAR_project: ${{ inputs.project_name }}
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   infrastructure:
     name: 🚀 ${{ inputs.action }} Infrastructure
@@ -41,11 +45,11 @@ jobs:
         repository: ${{ github.repository_owner }}/ia-ops-iac
         token: ${{ secrets.GITHUB_TOKEN }}
         
-    - name: ⚙️ Configure AWS Credentials
+    - name: ⚙️ Configure AWS Credentials (OIDC)
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        role-session-name: BillPayInfrastructure
         aws-region: ${{ env.AWS_REGION }}
         
     - name: 🔧 Setup Terragrunt

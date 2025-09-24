@@ -19,6 +19,10 @@ env:
   PROJECT_NAME: ${{ inputs.project_name }}
   ENVIRONMENT: ${{ inputs.environment }}
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   deploy-demo:
     name: 🚀 Deploy BillPay Demo
@@ -49,11 +53,11 @@ jobs:
           echo "✅ AWS credentials found in secrets"
         fi
         
-    - name: ⚙️ Configure AWS Credentials
+    - name: ⚙️ Configure AWS Credentials (OIDC)
       uses: aws-actions/configure-aws-credentials@v4
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        role-session-name: BillPaySimpleDeploy
         aws-region: ${{ env.AWS_REGION }}
         
     - name: 🔐 Verify AWS Connection
