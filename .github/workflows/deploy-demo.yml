@@ -1,0 +1,85 @@
+name: 🎯 BillPay Demo Deploy
+
+on:
+  workflow_call:
+    inputs:
+      project_name:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+      deployment_type:
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      project_name:
+        description: 'Project Name'
+        required: true
+        default: 'billpay-demo'
+      environment:
+        description: 'Environment'
+        required: true
+        default: 'demo'
+      deployment_type:
+        description: 'Deployment Type'
+        required: true
+        type: choice
+        options:
+          - simulation
+          - real-aws-oidc
+          - real-aws-legacy
+
+jobs:
+  demo-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🎭 Simulation Deploy
+        if: inputs.deployment_type == 'simulation'
+        run: |
+          echo "🎯 Starting BillPay Demo Simulation..."
+          echo "📋 Project: ${{ inputs.project_name }}"
+          echo "🌍 Environment: ${{ inputs.environment }}"
+          echo "🎭 Mode: Simulation (No real resources)"
+          echo ""
+          echo "🚀 Simulating AWS Infrastructure Creation..."
+          sleep 2
+          echo "✅ VPC created (simulated)"
+          echo "✅ EKS cluster created (simulated)"
+          echo "✅ ECR repositories created (simulated)"
+          echo "✅ S3 buckets created (simulated)"
+          echo "✅ CloudFront distributions created (simulated)"
+          echo ""
+          echo "🐳 Simulating Container Deployments..."
+          sleep 2
+          echo "✅ Backend deployed (simulated)"
+          echo "✅ Frontend A deployed (simulated)"
+          echo "✅ Frontend B deployed (simulated)"
+          echo "✅ Feature Flags deployed (simulated)"
+          echo ""
+          echo "🎉 Demo deployment completed successfully!"
+          echo "💰 Cost: $0.00 (simulation mode)"
+
+      - name: 🔐 Real AWS Deploy (OIDC)
+        if: inputs.deployment_type == 'real-aws-oidc'
+        uses: ./.github/workflows/deploy-complete.yml
+        with:
+          cloud_provider: aws
+          region: us-east-1
+          environment: ${{ inputs.environment }}
+          project_name: ${{ inputs.project_name }}
+          auth_method: oidc
+
+      - name: ☁️ Real AWS Deploy (Legacy)
+        if: inputs.deployment_type == 'real-aws-legacy'
+        uses: ./.github/workflows/deploy-complete.yml
+        with:
+          cloud_provider: aws
+          region: us-east-1
+          environment: ${{ inputs.environment }}
+          project_name: ${{ inputs.project_name }}
+          auth_method: legacy
