@@ -72,6 +72,8 @@ cat > deployment-policy.json << EOF
         "s3:PutBucketWebsite",
         "s3:PutBucketPolicy",
         "s3:PutBucketAcl",
+        "s3:PutBucketPublicAccessBlock",
+        "s3:GetBucketPublicAccessBlock",
         "s3:PutObject",
         "s3:GetObject",
         "s3:DeleteObject",
