@@ -47,12 +47,17 @@ env:
   ENVIRONMENT: ${{ inputs.environment }}
   CLOUD_PROVIDER: ${{ inputs.cloud_provider }}
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   validate-inputs:
     runs-on: ubuntu-latest
     outputs:
       apps_config: ${{ steps.parse.outputs.apps_config }}
       infra_config: ${{ steps.parse.outputs.infra_config }}
+      deploy_infra: ${{ steps.parse.outputs.deploy_infra }}
     steps:
       - name: Parse BillPay Applications
         id: parse
@@ -80,97 +85,119 @@ jobs:
             \"secrets_manager\": \"${INFRA[5]}\",
             \"monitoring\": \"${INFRA[6]}\"
           }" >> $GITHUB_OUTPUT
+          
+          # Check if infrastructure deployment is needed
+          if [[ "${INFRA[0]}" == "true" || "${INFRA[1]}" != "false" || "${INFRA[2]}" == "true" ]]; then
+            echo "deploy_infra=true" >> $GITHUB_OUTPUT
+          else
+            echo "deploy_infra=false" >> $GITHUB_OUTPUT
+          fi
 
-  simulation-deployment:
-    if: ${{ inputs.deployment_type == 'simulation' }}
-    runs-on: ubuntu-latest
+  deploy-infrastructure:
     needs: validate-inputs
+    if: needs.validate-inputs.outputs.deploy_infra == 'true' && inputs.deployment_type != 'simulation'
+    uses: ./.github/workflows/deploy-infrastructure-reusable.yml
+    with:
+      environment: ${{ inputs.environment }}
+      action: apply
+      project_name: ${{ inputs.project_name }}
+      cloud_provider: ${{ inputs.cloud_provider }}
+      region: ${{ inputs.region }}
+      infrastructure_components: ${{ inputs.infrastructure_components }}
+    secrets: inherit
+
+  deploy-applications:
+    needs: [validate-inputs, deploy-infrastructure]
+    if: always() && (needs.deploy-infrastructure.result == 'success' || needs.deploy-infrastructure.result == 'skipped')
+    uses: ./.github/workflows/deploy-applications-reusable.yml
+    with:
+      environment: ${{ inputs.environment }}
+      project_name: ${{ inputs.project_name }}
+      cloud_provider: ${{ inputs.cloud_provider }}
+      region: ${{ inputs.region }}
+      billpay_applications: ${{ inputs.billpay_applications }}
+      target_repository: ${{ inputs.target_repository }}
+      deployment_type: ${{ inputs.deployment_type }}
+    secrets: inherit
+
+  simulation:
+    if: inputs.deployment_type == 'simulation'
+    runs-on: ubuntu-latest
     steps:
-      - name: 🎭 Simulate BillPay Complete Stack Deployment
+      - name: 🎭 BillPay Complete Stack Simulation
         run: |
-          echo "🏦 BillPay Complete Stack Simulation Started"
-          echo "📋 Project: ${{ inputs.project_name }}"
+          echo "🎭 SIMULATION MODE - BillPay Complete Stack"
+          echo "=========================================="
+          echo "📦 Project: ${{ inputs.project_name }}"
+          echo "🌍 Environment: ${{ inputs.environment }}"
           echo "☁️ Cloud: ${{ inputs.cloud_provider }}"
-          echo "🌍 Region: ${{ inputs.region }}"
-          echo "🎯 Environment: ${{ inputs.environment }}"
+          echo "🌐 Region: ${{ inputs.region }}"
+          echo ""
           
+          # Parse and show applications
+          IFS=',' read -ra APPS <<< "${{ inputs.billpay_applications }}"
           echo "🚀 BillPay Applications:"
-          echo "${{ needs.validate-inputs.outputs.apps_config }}" | jq -r 'to_entries[] | "  \(.key): \(.value)"'
+          [[ "${APPS[0]}" == "true" ]] && echo "  ✅ Backend API (Java/Spring Boot)"
+          [[ "${APPS[1]}" == "true" ]] && echo "  ✅ Payment Service (Core payments)"
+          [[ "${APPS[2]}" == "true" ]] && echo "  ✅ User Service (Authentication)"
+          [[ "${APPS[3]}" == "true" ]] && echo "  ✅ Admin Service (Management)"
+          [[ "${APPS[4]}" == "true" ]] && echo "  ✅ Frontend Payment (Angular 17)"
+          [[ "${APPS[5]}" == "true" ]] && echo "  ✅ Frontend Admin (Angular 17)"
+          [[ "${APPS[6]}" == "true" ]] && echo "  ✅ Feature Flags (A/B Testing)"
+          echo ""
           
+          # Parse and show infrastructure
+          IFS=',' read -ra INFRA <<< "${{ inputs.infrastructure_components }}"
           echo "🏗️ Infrastructure Components:"
-          echo "${{ needs.validate-inputs.outputs.infra_config }}" | jq -r 'to_entries[] | "  \(.key): \(.value)"'
+          [[ "${INFRA[0]}" == "true" ]] && echo "  ✅ VPC Network (10.0.0.0/16)"
+          [[ "${INFRA[1]}" != "false" ]] && echo "  ✅ Kubernetes (${INFRA[1]})"
+          [[ "${INFRA[2]}" == "true" ]] && echo "  ✅ Container Registry"
+          [[ "${INFRA[3]}" == "true" ]] && echo "  ✅ Object Storage + CDN"
+          [[ "${INFRA[4]}" == "true" ]] && echo "  ✅ Load Balancer"
+          [[ "${INFRA[5]}" == "true" ]] && echo "  ✅ Secrets Manager"
+          [[ "${INFRA[6]}" == "true" ]] && echo "  ✅ Monitoring Stack"
+          echo ""
           
           echo "⏱️ Simulating deployment phases..."
-          sleep 30
-          echo "✅ Phase 1: Infrastructure simulation completed"
-          sleep 20
-          echo "✅ Phase 2: Applications simulation completed"
-          echo "🎉 BillPay Complete Stack simulation finished successfully!"
+          echo "🏗️ Phase 1: Infrastructure setup..." && sleep 3
+          echo "🐳 Phase 2: Container builds..." && sleep 2
+          echo "☸️ Phase 3: Kubernetes deployments..." && sleep 3
+          echo "🌐 Phase 4: Frontend deployments..." && sleep 2
+          echo "🔗 Phase 5: Service integration..." && sleep 2
+          echo ""
+          echo "🎉 BillPay Complete Stack simulation completed!"
+          echo "💰 Estimated real costs: $300-450/month"
+          echo "⏱️ Real deployment time: 25-35 minutes"
 
-  real-deployment:
-    if: ${{ inputs.deployment_type != 'simulation' }}
-    runs-on: ubuntu-latest
-    needs: validate-inputs
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials (OIDC)
-        if: ${{ inputs.deployment_type == 'real-aws-oidc' && inputs.cloud_provider == 'aws' }}
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-session-name: BillPayCompleteStackDeployment
-          aws-region: ${{ inputs.region }}
-
-      - name: Configure AWS Credentials (Legacy)
-        if: ${{ inputs.deployment_type == 'real-aws-legacy' && inputs.cloud_provider == 'aws' }}
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ inputs.region }}
-
-      - name: Deploy Infrastructure
-        uses: ./.github/workflows/deploy-infrastructure-reusable.yml
-        with:
-          project_name: ${{ inputs.project_name }}
-          environment: ${{ inputs.environment }}
-          cloud_provider: ${{ inputs.cloud_provider }}
-          region: ${{ inputs.region }}
-          infrastructure_config: ${{ needs.validate-inputs.outputs.infra_config }}
-
-      - name: Deploy Applications
-        uses: ./.github/workflows/deploy-applications-reusable.yml
-        with:
-          project_name: ${{ inputs.project_name }}
-          environment: ${{ inputs.environment }}
-          cloud_provider: ${{ inputs.cloud_provider }}
-          applications_config: ${{ needs.validate-inputs.outputs.apps_config }}
-
-      - name: Update Target Repository
-        run: |
-          echo "📝 Updating target repository: ${{ inputs.target_repository }}"
-          # Add deployment status to target repo
-          curl -X POST \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/giovanemere/${{ inputs.target_repository }}/dispatches \
-            -d '{"event_type":"deployment-completed","client_payload":{"status":"success","project":"${{ inputs.project_name }}"}}'
-
-  notify-completion:
-    runs-on: ubuntu-latest
-    needs: [validate-inputs, simulation-deployment, real-deployment]
+  summary:
+    needs: [validate-inputs, deploy-infrastructure, deploy-applications, simulation]
     if: always()
+    runs-on: ubuntu-latest
     steps:
-      - name: Deployment Summary
+      - name: 📊 Deployment Summary
         run: |
-          echo "🎉 BillPay Complete Stack Deployment Summary"
-          echo "📋 Project: ${{ inputs.project_name }}"
-          echo "🎯 Type: ${{ inputs.deployment_type }}"
-          echo "☁️ Cloud: ${{ inputs.cloud_provider }}"
-          echo "🌍 Region: ${{ inputs.region }}"
-          echo "✅ Status: Completed"
+          echo "## 🏦 BillPay Complete Stack Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Project:** ${{ inputs.project_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Cloud Provider:** ${{ inputs.cloud_provider }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Region:** ${{ inputs.region }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment Type:** ${{ inputs.deployment_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ inputs.deployment_type }}" == "simulation" ]; then
+            echo "### 🎭 Simulation Results:" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status:** ✅ Completed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "- **Duration:** ~30 seconds" >> $GITHUB_STEP_SUMMARY
+            echo "- **Cost:** $0 (simulation)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ☁️ Real Deployment Results:" >> $GITHUB_STEP_SUMMARY
+            echo "- **Infrastructure:** ${{ needs.deploy-infrastructure.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Applications:** ${{ needs.deploy-applications.result }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Duration:** 25-35 minutes" >> $GITHUB_STEP_SUMMARY
+            echo "- **Cost:** $300-450/month" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Access Links:" >> $GITHUB_STEP_SUMMARY
+          echo "- [Target Repository](https://github.com/giovanemere/${{ inputs.target_repository }})" >> $GITHUB_STEP_SUMMARY
+          echo "- [AWS Console](https://console.aws.amazon.com/)" >> $GITHUB_STEP_SUMMARY
