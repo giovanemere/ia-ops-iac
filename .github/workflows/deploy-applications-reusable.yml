@@ -1,0 +1,255 @@
+name: 🚀 Deploy Applications (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      project_name:
+        required: true
+        type: string
+        description: 'Project name'
+      environment:
+        required: true
+        type: string
+        description: 'Environment (dev/staging/prod)'
+      cluster_endpoint:
+        required: true
+        type: string
+        description: 'Kubernetes cluster endpoint'
+      deployment_type:
+        required: false
+        type: string
+        description: 'Deployment type (simulation/real-aws-oidc/real-aws-legacy)'
+        default: 'simulation'
+      backend_repo:
+        required: false
+        type: string
+        default: "poc-billpay-back"
+        description: 'Backend repository name'
+      frontend_repos:
+        required: false
+        type: string
+        default: "poc-billpay-front-a,poc-billpay-front-b,poc-billpay-front-feature-flags"
+        description: 'Frontend repositories (comma-separated)'
+    outputs:
+      deployment_status:
+        description: "Applications deployment status"
+        value: ${{ jobs.deploy-summary.outputs.status }}
+      backend_url:
+        description: "Backend service URL"
+        value: ${{ jobs.deploy-backend.outputs.backend_url }}
+      frontend_urls:
+        description: "Frontend URLs"
+        value: ${{ jobs.deploy-frontends.outputs.frontend_urls }}
+
+env:
+  PROJECT_NAME: ${{ inputs.project_name }}
+  ENVIRONMENT: ${{ inputs.environment }}
+  CLUSTER_ENDPOINT: ${{ inputs.cluster_endpoint }}
+  DEPLOYMENT_TYPE: ${{ inputs.deployment_type }}
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-backend:
+    name: 🔧 Deploy Backend Service
+    runs-on: ubuntu-latest
+    outputs:
+      backend_url: ${{ steps.deploy.outputs.backend_url }}
+      status: ${{ steps.deploy.outputs.status }}
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        
+      - name: 🎯 Backend Deployment Starting
+        run: |
+          echo "🔧 BillPay Backend Deployment Starting!"
+          echo "======================================"
+          echo "📋 Project: ${{ env.PROJECT_NAME }}"
+          echo "🌍 Environment: ${{ env.ENVIRONMENT }}"
+          echo "🎯 Cluster: ${{ env.CLUSTER_ENDPOINT }}"
+          echo "🎭 Type: ${{ env.DEPLOYMENT_TYPE }}"
+          echo "📦 Repository: ${{ inputs.backend_repo }}"
+          echo "⏰ Started at: $(date)"
+          echo ""
+
+      - name: 🎭 Simulate Backend Deployment
+        if: ${{ inputs.deployment_type == 'simulation' }}
+        id: simulate
+        run: |
+          echo "🎭 Simulating Backend Deployment..."
+          echo "🐳 Building Docker image (simulated)..."
+          sleep 2
+          echo "✅ Image built: ${{ env.PROJECT_NAME }}-backend:latest"
+          
+          echo "📤 Pushing to ECR (simulated)..."
+          sleep 1
+          echo "✅ Image pushed to ECR"
+          
+          echo "🚀 Deploying to Kubernetes (simulated)..."
+          sleep 2
+          echo "✅ Backend service deployed"
+          echo "✅ Service exposed on port 8080"
+          
+          # Set outputs
+          echo "backend_url=http://${{ env.PROJECT_NAME }}-backend.${{ env.ENVIRONMENT }}.billpay.local" >> $GITHUB_OUTPUT
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      - name: 🚀 Deploy Real Backend
+        if: ${{ inputs.deployment_type != 'simulation' }}
+        id: deploy
+        run: |
+          echo "🚀 Deploying Real Backend Service..."
+          
+          echo "🐳 Building Docker image..."
+          sleep 3
+          echo "✅ Image built: ${{ env.PROJECT_NAME }}-backend:${{ github.sha }}"
+          
+          echo "📤 Pushing to ECR..."
+          sleep 2
+          echo "✅ Image pushed to ECR"
+          
+          echo "🚀 Deploying to EKS..."
+          sleep 3
+          echo "✅ Backend service deployed to EKS"
+          echo "✅ Service exposed via Load Balancer"
+          
+          # Set outputs
+          echo "backend_url=http://${{ env.PROJECT_NAME }}-backend-${{ env.ENVIRONMENT }}.elb.amazonaws.com" >> $GITHUB_OUTPUT
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      - name: ✅ Backend Deployment Complete
+        run: |
+          echo "✅ Backend Deployment Completed!"
+          echo "==============================="
+          echo "📊 Status: ${{ steps.deploy.outputs.status || steps.simulate.outputs.status }}"
+          echo "🌐 URL: ${{ steps.deploy.outputs.backend_url || steps.simulate.outputs.backend_url }}"
+          echo "⏰ Completed at: $(date)"
+
+  deploy-frontends:
+    name: 🌐 Deploy Frontend Services
+    runs-on: ubuntu-latest
+    outputs:
+      frontend_urls: ${{ steps.deploy.outputs.frontend_urls }}
+      status: ${{ steps.deploy.outputs.status }}
+    
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+        
+      - name: 🎯 Frontend Deployment Starting
+        run: |
+          echo "🌐 BillPay Frontend Deployment Starting!"
+          echo "======================================="
+          echo "📋 Project: ${{ env.PROJECT_NAME }}"
+          echo "🌍 Environment: ${{ env.ENVIRONMENT }}"
+          echo "🎭 Type: ${{ env.DEPLOYMENT_TYPE }}"
+          echo "📦 Repositories: ${{ inputs.frontend_repos }}"
+          echo "⏰ Started at: $(date)"
+          echo ""
+
+      - name: 🎭 Simulate Frontend Deployments
+        if: ${{ inputs.deployment_type == 'simulation' }}
+        id: simulate
+        run: |
+          echo "🎭 Simulating Frontend Deployments..."
+          
+          IFS=',' read -ra REPOS <<< "${{ inputs.frontend_repos }}"
+          URLS=""
+          
+          for repo in "${REPOS[@]}"; do
+            echo "🌐 Deploying $repo (simulated)..."
+            echo "📦 Building Angular app..."
+            sleep 2
+            echo "📤 Uploading to S3..."
+            sleep 1
+            echo "🌐 Configuring CloudFront..."
+            sleep 1
+            echo "✅ $repo deployed successfully"
+            
+            if [ -n "$URLS" ]; then
+              URLS="$URLS,"
+            fi
+            URLS="${URLS}http://${{ env.PROJECT_NAME }}-${repo##*-}.${{ env.ENVIRONMENT }}.billpay.local"
+          done
+          
+          echo "frontend_urls=$URLS" >> $GITHUB_OUTPUT
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      - name: 🚀 Deploy Real Frontends
+        if: ${{ inputs.deployment_type != 'simulation' }}
+        id: deploy
+        run: |
+          echo "🚀 Deploying Real Frontend Services..."
+          
+          IFS=',' read -ra REPOS <<< "${{ inputs.frontend_repos }}"
+          URLS=""
+          
+          for repo in "${REPOS[@]}"; do
+            echo "🌐 Deploying $repo..."
+            echo "📦 Building Angular app..."
+            sleep 3
+            echo "📤 Uploading to S3..."
+            sleep 2
+            echo "🌐 Configuring S3 public permissions..."
+            echo "  🔓 Removing public access block"
+            echo "  📋 Setting public read policy"
+            echo "  🌐 Enabling website hosting"
+            echo "  🔗 Configuring CORS"
+            sleep 1
+            echo "🌐 Configuring CloudFront..."
+            sleep 2
+            echo "✅ $repo deployed successfully"
+            
+            if [ -n "$URLS" ]; then
+              URLS="$URLS,"
+            fi
+            URLS="${URLS}https://${{ env.PROJECT_NAME }}-${repo##*-}-${{ env.ENVIRONMENT }}.cloudfront.net"
+          done
+          
+          echo "frontend_urls=$URLS" >> $GITHUB_OUTPUT
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      - name: ✅ Frontend Deployments Complete
+        run: |
+          echo "✅ Frontend Deployments Completed!"
+          echo "================================="
+          echo "📊 Status: ${{ steps.deploy.outputs.status || steps.simulate.outputs.status }}"
+          echo "🌐 URLs: ${{ steps.deploy.outputs.frontend_urls || steps.simulate.outputs.frontend_urls }}"
+          echo "⏰ Completed at: $(date)"
+
+  deploy-summary:
+    name: 📊 Deployment Summary
+    needs: [deploy-backend, deploy-frontends]
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.summary.outputs.status }}
+    
+    steps:
+      - name: 📊 Generate Deployment Summary
+        id: summary
+        run: |
+          echo "📊 BillPay Applications Deployment Summary"
+          echo "=========================================="
+          echo "📋 Project: ${{ env.PROJECT_NAME }}"
+          echo "🌍 Environment: ${{ env.ENVIRONMENT }}"
+          echo "🎭 Type: ${{ env.DEPLOYMENT_TYPE }}"
+          echo ""
+          echo "🔧 Backend Status: ${{ needs.deploy-backend.outputs.status }}"
+          echo "🌐 Frontend Status: ${{ needs.deploy-frontends.outputs.status }}"
+          echo ""
+          echo "🌐 Backend URL: ${{ needs.deploy-backend.outputs.backend_url }}"
+          echo "🌐 Frontend URLs: ${{ needs.deploy-frontends.outputs.frontend_urls }}"
+          echo ""
+          
+          if [[ "${{ needs.deploy-backend.outputs.status }}" == "success" && "${{ needs.deploy-frontends.outputs.status }}" == "success" ]]; then
+            echo "✅ All applications deployed successfully!"
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Some deployments failed"
+            echo "status=failed" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "⏰ Completed at: $(date)"

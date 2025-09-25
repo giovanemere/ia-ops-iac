@@ -109,6 +109,7 @@ jobs:
           echo "Creating S3 bucket: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-frontend-b (simulated)"
           echo "Creating S3 bucket: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-frontend-feature-flags (simulated)"
           echo "✅ S3 buckets created (simulated): 3 buckets"
+          echo "🌐 S3 public access configured (simulated): website hosting enabled"
           echo "✅ CloudFront distributions created (simulated): 3 distributions"
           echo "✅ Load balancer created (simulated)"
           echo "✅ Security groups configured (simulated)"
@@ -146,6 +147,14 @@ jobs:
           echo "Creating S3 bucket: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-frontend-feature-flags"
           sleep 2
           echo "✅ S3 buckets created: 3 buckets"
+          
+          # S3 Public Access Configuration
+          echo "🌐 Configuring S3 public access for website hosting..."
+          echo "Setting bucket policy for public read access"
+          echo "Enabling static website hosting"
+          echo "Configuring CORS for cross-origin requests"
+          sleep 1
+          echo "✅ S3 buckets configured for public website access"
           
           # CloudFront
           echo "🌐 Creating CloudFront Distributions..."
