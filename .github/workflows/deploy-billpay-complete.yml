@@ -99,10 +99,11 @@ jobs:
     uses: ./.github/workflows/deploy-infrastructure-reusable.yml
     with:
       environment: ${{ inputs.environment }}
-      action: apply
       project_name: ${{ inputs.project_name }}
       cloud_provider: ${{ inputs.cloud_provider }}
       region: ${{ inputs.region }}
+      auth_method: oidc
+      deployment_type: ${{ inputs.deployment_type }}
       infrastructure_components: ${{ inputs.infrastructure_components }}
     secrets: inherit
 
