@@ -46,9 +46,11 @@ on:
         type: boolean
         description: 'Include monitoring setup'
         default: false
+      infrastructure_components:
+        required: false
         type: string
-        description: 'Deployment type (simulation/real-aws-oidc/real-aws-legacy)'
-        default: 'simulation'
+        description: 'Infrastructure components (comma-separated)'
+        default: 'true,eks,true,true,true,true,false'
     outputs:
       infrastructure_status:
         description: "Infrastructure deployment status"
