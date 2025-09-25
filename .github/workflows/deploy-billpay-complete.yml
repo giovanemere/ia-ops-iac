@@ -64,27 +64,11 @@ jobs:
         run: |
           # Parse applications string
           IFS=',' read -ra APPS <<< "${{ inputs.billpay_applications }}"
-          echo "apps_config={
-            \"backend_api\": \"${APPS[0]}\",
-            \"payment_service\": \"${APPS[1]}\", 
-            \"user_service\": \"${APPS[2]}\",
-            \"admin_service\": \"${APPS[3]}\",
-            \"frontend_payment\": \"${APPS[4]}\",
-            \"frontend_admin\": \"${APPS[5]}\",
-            \"feature_flags\": \"${APPS[6]}\"
-          }" >> $GITHUB_OUTPUT
+          echo "apps_config=backend_api:${APPS[0]},payment_service:${APPS[1]},user_service:${APPS[2]},admin_service:${APPS[3]},frontend_payment:${APPS[4]},frontend_admin:${APPS[5]},feature_flags:${APPS[6]}" >> $GITHUB_OUTPUT
           
           # Parse infrastructure string
           IFS=',' read -ra INFRA <<< "${{ inputs.infrastructure_components }}"
-          echo "infra_config={
-            \"vpc\": \"${INFRA[0]}\",
-            \"kubernetes\": \"${INFRA[1]}\",
-            \"container_registry\": \"${INFRA[2]}\",
-            \"object_storage\": \"${INFRA[3]}\",
-            \"load_balancer\": \"${INFRA[4]}\",
-            \"secrets_manager\": \"${INFRA[5]}\",
-            \"monitoring\": \"${INFRA[6]}\"
-          }" >> $GITHUB_OUTPUT
+          echo "infra_config=vpc:${INFRA[0]},kubernetes:${INFRA[1]},container_registry:${INFRA[2]},object_storage:${INFRA[3]},load_balancer:${INFRA[4]},secrets_manager:${INFRA[5]},monitoring:${INFRA[6]}" >> $GITHUB_OUTPUT
           
           # Check if infrastructure deployment is needed
           if [[ "${INFRA[0]}" == "true" || "${INFRA[1]}" != "false" || "${INFRA[2]}" == "true" ]]; then
