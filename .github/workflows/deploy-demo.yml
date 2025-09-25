@@ -79,6 +79,13 @@ jobs:
           # Create bucket
           aws s3 mb s3://$BUCKET_NAME --region ${{ env.AWS_REGION }} || echo "Bucket may already exist"
           
+          # Disable block public access
+          echo "🔓 Disabling block public access..."
+          aws s3api put-public-access-block \
+            --bucket $BUCKET_NAME \
+            --public-access-block-configuration \
+            "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+          
           # Configure for static website hosting
           aws s3 website s3://$BUCKET_NAME --index-document index.html --error-document error.html
           
