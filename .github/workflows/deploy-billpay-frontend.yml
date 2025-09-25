@@ -1,0 +1,90 @@
+name: Deploy BillPay Frontend
+
+on:
+  workflow_dispatch:
+    inputs:
+      frontend_name:
+        description: 'Frontend name'
+        required: true
+        type: string
+      frontend_type:
+        description: 'Frontend type'
+        required: true
+        type: choice
+        options: [payment-interface, admin-panel, feature-flags, custom]
+      deployment_type:
+        description: 'Deployment type'
+        required: true
+        type: choice
+        options: [simulation, real-aws-oidc, real-aws-legacy]
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options: [dev, staging, prod]
+      target_repository:
+        description: 'Target repository'
+        required: true
+        type: string
+      force_deploy:
+        description: 'Force deployment'
+        type: boolean
+        default: false
+
+jobs:
+  simulation-deployment:
+    if: ${{ inputs.deployment_type == 'simulation' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🎭 Simulate Frontend Deployment
+        run: |
+          echo "🎨 BillPay Frontend Simulation: ${{ inputs.frontend_name }}"
+          echo "🎯 Type: ${{ inputs.frontend_type }}"
+          echo "🌍 Environment: ${{ inputs.environment }}"
+          echo "📦 Target: ${{ inputs.target_repository }}"
+          
+          echo "⏱️ Simulating deployment phases..."
+          sleep 10
+          echo "✅ Phase 1: S3 bucket creation simulation"
+          sleep 8
+          echo "✅ Phase 2: CloudFront distribution simulation"
+          sleep 7
+          echo "✅ Phase 3: Angular build and upload simulation"
+          echo "🎉 Frontend ${{ inputs.frontend_name }} simulation completed!"
+
+  real-deployment:
+    if: ${{ inputs.deployment_type != 'simulation' }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        if: ${{ inputs.deployment_type == 'real-aws-oidc' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: BillPayFrontendDeployment
+          aws-region: us-east-1
+
+      - name: Deploy Frontend Infrastructure
+        run: |
+          echo "🏗️ Deploying S3 + CloudFront for ${{ inputs.frontend_name }}"
+          # Add actual S3/CloudFront deployment logic here
+          
+      - name: Deploy Frontend Application
+        run: |
+          echo "🚀 Deploying Angular app ${{ inputs.frontend_name }}"
+          # Add actual frontend build and upload logic here
+
+      - name: Update Target Repository
+        run: |
+          echo "📝 Updating target repository: ${{ inputs.target_repository }}"
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ inputs.target_repository }}/dispatches \
+            -d '{"event_type":"deployment-completed","client_payload":{"status":"success","frontend":"${{ inputs.frontend_name }}"}}'

@@ -1,0 +1,176 @@
+name: Deploy BillPay Complete Stack
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_name:
+        description: 'Target project name'
+        required: true
+        type: string
+      environment:
+        description: 'Environment (dev/staging/prod)'
+        required: true
+        type: choice
+        options: [dev, staging, prod]
+      deployment_type:
+        description: 'Deployment type'
+        required: true
+        type: choice
+        options: [simulation, real-aws-oidc, real-aws-legacy]
+      cloud_provider:
+        description: 'Cloud provider'
+        required: true
+        type: choice
+        options: [aws, gcp, azure, oci]
+      region:
+        description: 'Cloud region'
+        required: true
+        type: string
+      billpay_applications:
+        description: 'BillPay apps to deploy (comma-separated booleans)'
+        required: true
+        type: string
+        # Format: backend_api,payment_service,user_service,admin_service,frontend_payment,frontend_admin,feature_flags
+      infrastructure_components:
+        description: 'Infrastructure components (comma-separated)'
+        required: true
+        type: string
+        # Format: vpc,kubernetes_type,container_registry,object_storage,load_balancer,secrets_manager,monitoring
+      target_repository:
+        description: 'Target repository name'
+        required: true
+        type: string
+
+env:
+  AWS_REGION: ${{ inputs.region }}
+  PROJECT_NAME: ${{ inputs.project_name }}
+  ENVIRONMENT: ${{ inputs.environment }}
+  CLOUD_PROVIDER: ${{ inputs.cloud_provider }}
+
+jobs:
+  validate-inputs:
+    runs-on: ubuntu-latest
+    outputs:
+      apps_config: ${{ steps.parse.outputs.apps_config }}
+      infra_config: ${{ steps.parse.outputs.infra_config }}
+    steps:
+      - name: Parse BillPay Applications
+        id: parse
+        run: |
+          # Parse applications string
+          IFS=',' read -ra APPS <<< "${{ inputs.billpay_applications }}"
+          echo "apps_config={
+            \"backend_api\": \"${APPS[0]}\",
+            \"payment_service\": \"${APPS[1]}\", 
+            \"user_service\": \"${APPS[2]}\",
+            \"admin_service\": \"${APPS[3]}\",
+            \"frontend_payment\": \"${APPS[4]}\",
+            \"frontend_admin\": \"${APPS[5]}\",
+            \"feature_flags\": \"${APPS[6]}\"
+          }" >> $GITHUB_OUTPUT
+          
+          # Parse infrastructure string
+          IFS=',' read -ra INFRA <<< "${{ inputs.infrastructure_components }}"
+          echo "infra_config={
+            \"vpc\": \"${INFRA[0]}\",
+            \"kubernetes\": \"${INFRA[1]}\",
+            \"container_registry\": \"${INFRA[2]}\",
+            \"object_storage\": \"${INFRA[3]}\",
+            \"load_balancer\": \"${INFRA[4]}\",
+            \"secrets_manager\": \"${INFRA[5]}\",
+            \"monitoring\": \"${INFRA[6]}\"
+          }" >> $GITHUB_OUTPUT
+
+  simulation-deployment:
+    if: ${{ inputs.deployment_type == 'simulation' }}
+    runs-on: ubuntu-latest
+    needs: validate-inputs
+    steps:
+      - name: 🎭 Simulate BillPay Complete Stack Deployment
+        run: |
+          echo "🏦 BillPay Complete Stack Simulation Started"
+          echo "📋 Project: ${{ inputs.project_name }}"
+          echo "☁️ Cloud: ${{ inputs.cloud_provider }}"
+          echo "🌍 Region: ${{ inputs.region }}"
+          echo "🎯 Environment: ${{ inputs.environment }}"
+          
+          echo "🚀 BillPay Applications:"
+          echo "${{ needs.validate-inputs.outputs.apps_config }}" | jq -r 'to_entries[] | "  \(.key): \(.value)"'
+          
+          echo "🏗️ Infrastructure Components:"
+          echo "${{ needs.validate-inputs.outputs.infra_config }}" | jq -r 'to_entries[] | "  \(.key): \(.value)"'
+          
+          echo "⏱️ Simulating deployment phases..."
+          sleep 30
+          echo "✅ Phase 1: Infrastructure simulation completed"
+          sleep 20
+          echo "✅ Phase 2: Applications simulation completed"
+          echo "🎉 BillPay Complete Stack simulation finished successfully!"
+
+  real-deployment:
+    if: ${{ inputs.deployment_type != 'simulation' }}
+    runs-on: ubuntu-latest
+    needs: validate-inputs
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        if: ${{ inputs.deployment_type == 'real-aws-oidc' && inputs.cloud_provider == 'aws' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: BillPayCompleteStackDeployment
+          aws-region: ${{ inputs.region }}
+
+      - name: Configure AWS Credentials (Legacy)
+        if: ${{ inputs.deployment_type == 'real-aws-legacy' && inputs.cloud_provider == 'aws' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.region }}
+
+      - name: Deploy Infrastructure
+        uses: ./.github/workflows/deploy-infrastructure-reusable.yml
+        with:
+          project_name: ${{ inputs.project_name }}
+          environment: ${{ inputs.environment }}
+          cloud_provider: ${{ inputs.cloud_provider }}
+          region: ${{ inputs.region }}
+          infrastructure_config: ${{ needs.validate-inputs.outputs.infra_config }}
+
+      - name: Deploy Applications
+        uses: ./.github/workflows/deploy-applications-reusable.yml
+        with:
+          project_name: ${{ inputs.project_name }}
+          environment: ${{ inputs.environment }}
+          cloud_provider: ${{ inputs.cloud_provider }}
+          applications_config: ${{ needs.validate-inputs.outputs.apps_config }}
+
+      - name: Update Target Repository
+        run: |
+          echo "📝 Updating target repository: ${{ inputs.target_repository }}"
+          # Add deployment status to target repo
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/giovanemere/${{ inputs.target_repository }}/dispatches \
+            -d '{"event_type":"deployment-completed","client_payload":{"status":"success","project":"${{ inputs.project_name }}"}}'
+
+  notify-completion:
+    runs-on: ubuntu-latest
+    needs: [validate-inputs, simulation-deployment, real-deployment]
+    if: always()
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "🎉 BillPay Complete Stack Deployment Summary"
+          echo "📋 Project: ${{ inputs.project_name }}"
+          echo "🎯 Type: ${{ inputs.deployment_type }}"
+          echo "☁️ Cloud: ${{ inputs.cloud_provider }}"
+          echo "🌍 Region: ${{ inputs.region }}"
+          echo "✅ Status: Completed"

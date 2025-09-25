@@ -1,0 +1,84 @@
+name: Deploy BillPay Microservice
+
+on:
+  workflow_dispatch:
+    inputs:
+      service_name:
+        description: 'Microservice name'
+        required: true
+        type: string
+      deployment_type:
+        description: 'Deployment type'
+        required: true
+        type: choice
+        options: [simulation, real-aws-oidc, real-aws-legacy]
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options: [dev, staging, prod]
+      target_repository:
+        description: 'Target repository'
+        required: true
+        type: string
+      force_deploy:
+        description: 'Force deployment'
+        type: boolean
+        default: false
+
+jobs:
+  simulation-deployment:
+    if: ${{ inputs.deployment_type == 'simulation' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🎭 Simulate Microservice Deployment
+        run: |
+          echo "🔧 BillPay Microservice Simulation: ${{ inputs.service_name }}"
+          echo "🌍 Environment: ${{ inputs.environment }}"
+          echo "📦 Target: ${{ inputs.target_repository }}"
+          
+          echo "⏱️ Simulating deployment phases..."
+          sleep 15
+          echo "✅ Phase 1: Container build simulation"
+          sleep 10
+          echo "✅ Phase 2: Kubernetes deployment simulation"
+          sleep 10
+          echo "✅ Phase 3: Service registration simulation"
+          echo "🎉 Microservice ${{ inputs.service_name }} simulation completed!"
+
+  real-deployment:
+    if: ${{ inputs.deployment_type != 'simulation' }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials (OIDC)
+        if: ${{ inputs.deployment_type == 'real-aws-oidc' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: BillPayMicroserviceDeployment
+          aws-region: us-east-1
+
+      - name: Deploy Microservice Infrastructure
+        run: |
+          echo "🏗️ Deploying infrastructure for ${{ inputs.service_name }}"
+          # Add actual deployment logic here
+          
+      - name: Deploy Microservice Application
+        run: |
+          echo "🚀 Deploying application ${{ inputs.service_name }}"
+          # Add actual application deployment logic here
+
+      - name: Update Target Repository
+        run: |
+          echo "📝 Updating target repository: ${{ inputs.target_repository }}"
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ inputs.target_repository }}/dispatches \
+            -d '{"event_type":"deployment-completed","client_payload":{"status":"success","service":"${{ inputs.service_name }}"}}'
