@@ -20,6 +20,15 @@ on:
         options: [simulation, real-aws-oidc, real-aws-legacy]
         default: simulation
 
+env:
+  AWS_REGION: us-east-1
+  PROJECT_NAME: ${{ inputs.project_name }}
+  ENVIRONMENT: ${{ inputs.environment }}
+
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -35,21 +44,104 @@ jobs:
         if: ${{ inputs.deployment_type == 'simulation' }}
         run: |
           echo "🎭 Running in SIMULATION mode - No real AWS resources will be created"
-          echo "✅ Simulating VPC creation..."
+          echo "✅ Simulating S3 bucket creation..."
+          echo "   Bucket name would be: ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-frontend"
           sleep 2
-          echo "✅ Simulating EKS cluster setup..."
+          echo "✅ Simulating static website configuration..."
+          sleep 2
+          echo "✅ Simulating CloudFront distribution..."
           sleep 3
-          echo "✅ Simulating application deployment..."
-          sleep 2
           echo "🎉 Demo simulation completed successfully!"
+          echo "🌐 Simulated URL: https://${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}.example.com"
           
-      - name: ☁️ Real AWS Deployment
+      - name: ⚙️ Configure AWS Credentials (OIDC)
+        if: ${{ inputs.deployment_type == 'real-aws-oidc' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-session-name: BillPayDemo
+          aws-region: ${{ env.AWS_REGION }}
+          
+      - name: ⚙️ Configure AWS Credentials (Legacy)
+        if: ${{ inputs.deployment_type == 'real-aws-legacy' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          
+      - name: 🪣 Create S3 Bucket
         if: ${{ inputs.deployment_type != 'simulation' }}
         run: |
-          echo "☁️ Real AWS deployment would start here"
-          echo "⚠️  This would create actual AWS resources"
-          echo "🔐 Using OIDC authentication"
-          echo "✅ Demo deployment completed!"
+          BUCKET_NAME="${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-frontend"
+          echo "🪣 Creating S3 bucket: $BUCKET_NAME"
+          
+          # Create bucket
+          aws s3 mb s3://$BUCKET_NAME --region ${{ env.AWS_REGION }} || echo "Bucket may already exist"
+          
+          # Configure for static website hosting
+          aws s3 website s3://$BUCKET_NAME --index-document index.html --error-document error.html
+          
+          # Set public read policy
+          cat > bucket-policy.json << EOF
+          {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Sid": "PublicReadGetObject",
+                "Effect": "Allow",
+                "Principal": "*",
+                "Action": "s3:GetObject",
+                "Resource": "arn:aws:s3:::$BUCKET_NAME/*"
+              }
+            ]
+          }
+          EOF
+          
+          aws s3api put-bucket-policy --bucket $BUCKET_NAME --policy file://bucket-policy.json
+          
+          # Upload a simple index.html
+          cat > index.html << EOF
+          <!DOCTYPE html>
+          <html>
+          <head>
+              <title>BillPay Demo - ${{ inputs.project_name }}</title>
+              <style>
+                  body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+                  .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                  h1 { color: #2c3e50; }
+                  .status { background: #d4edda; color: #155724; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                  .info { background: #e7f3ff; color: #0c5460; padding: 15px; border-radius: 5px; margin: 20px 0; }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>🏦 BillPay Demo Platform</h1>
+                  <div class="status">
+                      ✅ <strong>Deployment Successful!</strong>
+                  </div>
+                  <div class="info">
+                      <h3>📊 Deployment Details:</h3>
+                      <ul>
+                          <li><strong>Project:</strong> ${{ inputs.project_name }}</li>
+                          <li><strong>Environment:</strong> ${{ inputs.environment }}</li>
+                          <li><strong>Type:</strong> ${{ inputs.deployment_type }}</li>
+                          <li><strong>Bucket:</strong> $BUCKET_NAME</li>
+                          <li><strong>Region:</strong> ${{ env.AWS_REGION }}</li>
+                      </ul>
+                  </div>
+                  <p>🎉 Your BillPay demo is now live and accessible via this S3 static website!</p>
+              </div>
+          </body>
+          </html>
+          EOF
+          
+          aws s3 cp index.html s3://$BUCKET_NAME/
+          
+          # Get website URL
+          WEBSITE_URL="http://$BUCKET_NAME.s3-website-${{ env.AWS_REGION }}.amazonaws.com"
+          echo "🌐 Website URL: $WEBSITE_URL"
+          echo "website_url=$WEBSITE_URL" >> $GITHUB_OUTPUT
           
       - name: 📊 Deployment Summary
         run: |
@@ -59,6 +151,20 @@ jobs:
           echo "- **Type:** ${{ inputs.deployment_type }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Status:** ✅ Completed" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 🌐 Access Links:" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ inputs.deployment_type }}" != "simulation" ]; then
+            BUCKET_NAME="${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-frontend"
+            WEBSITE_URL="http://$BUCKET_NAME.s3-website-${{ env.AWS_REGION }}.amazonaws.com"
+            echo "### 🌐 Live Resources:" >> $GITHUB_STEP_SUMMARY
+            echo "- **S3 Bucket:** $BUCKET_NAME" >> $GITHUB_STEP_SUMMARY
+            echo "- **Website URL:** [$WEBSITE_URL]($WEBSITE_URL)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### 🎭 Simulation Results:" >> $GITHUB_STEP_SUMMARY
+            echo "- **Simulated Bucket:** ${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}-frontend" >> $GITHUB_STEP_SUMMARY
+            echo "- **Simulated URL:** https://${{ env.PROJECT_NAME }}-${{ env.ENVIRONMENT }}.example.com" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Access Links:" >> $GITHUB_STEP_SUMMARY
           echo "- [GitHub Repository](https://github.com/giovanemere/${{ inputs.project_name }})" >> $GITHUB_STEP_SUMMARY
           echo "- [AWS Console](https://console.aws.amazon.com/)" >> $GITHUB_STEP_SUMMARY
