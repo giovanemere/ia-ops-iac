@@ -31,6 +31,24 @@ on:
         type: string
         description: 'Deployment type (simulation/real-aws-oidc/real-aws-legacy)'
         default: 'simulation'
+      include_eks:
+        required: false
+        type: boolean
+        description: 'Include EKS cluster deployment'
+        default: true
+      include_cdn:
+        required: false
+        type: boolean
+        description: 'Include CDN configuration'
+        default: true
+      include_monitoring:
+        required: false
+        type: boolean
+        description: 'Include monitoring setup'
+        default: false
+        type: string
+        description: 'Deployment type (simulation/real-aws-oidc/real-aws-legacy)'
+        default: 'simulation'
     outputs:
       infrastructure_status:
         description: "Infrastructure deployment status"
