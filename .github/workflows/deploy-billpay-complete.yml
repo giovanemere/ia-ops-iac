@@ -114,11 +114,10 @@ jobs:
     with:
       environment: ${{ inputs.environment }}
       project_name: ${{ inputs.project_name }}
-      cloud_provider: ${{ inputs.cloud_provider }}
-      region: ${{ inputs.region }}
-      billpay_applications: ${{ inputs.billpay_applications }}
-      target_repository: ${{ inputs.target_repository }}
+      cluster_endpoint: ${{ needs.deploy-infrastructure.outputs.cluster_endpoint || 'simulation-cluster' }}
       deployment_type: ${{ inputs.deployment_type }}
+      backend_repo: ${{ inputs.target_repository }}
+      frontend_repos: "poc-billpay-front-a,poc-billpay-front-b,poc-billpay-front-feature-flags"
     secrets: inherit
 
   simulation:
